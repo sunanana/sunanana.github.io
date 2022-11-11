@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>golang AST Explorer</title>
+    <script src="wasm_exec.js"></script>
+</head>
+
+<body>
+    <script>
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("ast.wasm"), go.importObject)
+            .then((result) => {
+                go.run(result.instance);
+                // 画面遷移時にASTパース処理を実行
+                handleAstPrintButtonClick();
+            })
+            .catch(e => console.error(e));
+
+        function handleAstPrintButtonClick() {
+            const inputSrc = document.querySelector("#input").value;
+            const result = ast.print(inputSrc);
+            const x = result.split("\n")
+                .map(row => {
+                    const splitted = row.split(/^\s*[0-9]+\s+/, 2)
+                    return splitted.length === 2
+                        ? splitted[1]
+                        : null
+                })
+                .filter(Boolean)
+                .map(row => row.replaceAll(/^(\.\s{2})(\.\s{2})*/g, (p0) => p0.replaceAll('.  ', "\t") ))
+            document.querySelector("#output").textContent = x.join("\n");
+        }
+
+        function onInputTextareaTabKey(ev, domElm){
+            if (ev.keyCode !== 9) return;
+            ev.preventDefault();
+
+            // 現在カーソルの位置取得
+            const cursorPosition = domElm.selectionStart;
+            // textareaの値を「カーソルの左側のテキスト」+「タブ」+「カーソルの右側のテキスト」に更新
+            domElm.value = `${domElm.value.substr(0, cursorPosition)}\t${domElm.value.substr(cursorPosition, domElm.value.length)}`;
+            // カーソルの位置を入力したタブの後ろに移動
+            domElm.selectionEnd = cursorPosition + 1;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // 入力欄のタブキー入力を有効にする
+            document.querySelector('#input').onkeydown = function(ev) { onInputTextareaTabKey(ev, this) };
+        });
+    </script>
+
+    <button
+        id="runButton"
+        onClick="handleAstPrintButtonClick()"
+        style="
+            width: 300px;
+            height: 40px;
+        "
+        >
+        AST Parse
+    </button>
+    <br>
+    <br>
+    <div
+        style="
+            display: flex;
+            gap: 8px;
+        "
+        >
+        <textarea
+            id="input"
+            style="
+                width: 49%;
+                height: 92vh;
+                margin: 0;
+                padding: 8px;
+            "
+            >package main
+
+type Hoge[T any] struct {
+    X *Fuga
+    Y T
+}
+</textarea>
+        <p
+            id="output"
+            style="
+                white-space: pre;
+                width: 49%;
+                height: 92vh;
+                margin: 0;
+                padding: 8px;
+                border: 1px orange solid;
+                overflow-y: scroll;
+            "
+            >
+        </p>
+    </div>
+</body>
+</html>
